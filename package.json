@@ -1,6 +1,6 @@
 {
   "name": "jwt-auth-lib-cognito",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -10,6 +10,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@nestjs/common": "^11.1.2",
+    "@nestjs/passport": "^11.0.5",
     "axios": "^1.9.0",
     "jsonwebtoken": "^9.0.2",
     "jwk-to-pem": "^2.0.7",
@@ -20,6 +22,7 @@
     "@types/jsonwebtoken": "^9.0.9",
     "@types/jwk-to-pem": "^2.0.3",
     "@types/node": "^22.15.29",
+    "@types/passport": "^1.0.17",
     "@types/passport-jwt": "^4.0.1",
     "typescript": "^5.8.3"
   }
