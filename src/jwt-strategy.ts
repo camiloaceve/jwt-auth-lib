@@ -1,25 +1,49 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy } from 'passport-jwt';
-import { CognitoJwtStrategy } from './cognito.strategy';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import axios from 'axios';
+import jwkToPem from 'jwk-to-pem';
+import * as jwt from 'jsonwebtoken';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  private base: CognitoJwtStrategy;
+  private static jwks: Record<string, string> = {};
+  private static jwksUrl: string;
 
-  constructor() {
-    const userPoolId = process.env.COGNITO_USER_POOL_ID!;
-    const region = process.env.AWS_REGION!;
-    const base = new CognitoJwtStrategy(userPoolId, region);
+  constructor(private userPoolId: string, private region: string) {
+    const jwksUrl = `https://cognito-idp.${region}.amazonaws.com/${userPoolId}/.well-known/jwks.json`;
+    JwtStrategy.jwksUrl = jwksUrl;
+
     super({
-      jwtFromRequest: base.jwtFromRequest,
-      ignoreExpiration: base.ignoreExpiration,
-      secretOrKeyProvider: base.getSecretOrKey,
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKeyProvider: JwtStrategy.getSecretOrKey,
     });
-    this.base = base;
+  }
+
+  private static async getSecretOrKey(_request: any, rawJwtToken: any, done: any) {
+    try {
+      const decoded = jwt.decode(rawJwtToken, { complete: true }) as any;
+      const kid = decoded?.header?.kid;
+
+      if (!kid) return done(new Error('Key ID not found in token.'), null);
+
+      if (JwtStrategy.jwks[kid]) return done(null, JwtStrategy.jwks[kid]);
+
+      const { data } = await axios.get(JwtStrategy.jwksUrl);
+      const key = data.keys.find((k:any) => k.kid === kid);
+      if (!key) return done(new Error('Key not found in JWKS.'), null);
+
+      const pem = jwkToPem(key);
+      JwtStrategy.jwks[kid] = pem;
+
+      done(null, pem);
+    } catch (err) {
+      done(err, null);
+    }
   }
 
   async validate(payload: any) {
-    return this.base.validate(payload);
+    return { userId: payload.sub, email: payload.email };
   }
 }

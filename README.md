@@ -36,84 +36,65 @@ yarn add jwt-auth-lib-cognito
 // auth.module.ts
 
 import { Module } from '@nestjs/common';
-import { PassportModule } from '@nestjs/passport';
-import { JwtStrategy } from 'jwt-auth-lib-cognito';
+import { ConfigModule } from '@nestjs/config';
+import { AuthCognitoModule } from 'jwt-auth-lib-cognito';
 
 @Module({
-  imports: [PassportModule],
-  providers: [
-    {
-      provide: JwtStrategy,
-      useFactory: () => {
-        const userPoolId = process.env.COGNITO_USER_POOL_ID;
-        const region = process.env.AWS_REGION;
-        return new JwtStrategy(userPoolId, region);
-      },
-    },
+  imports: [
+    ConfigModule.forRoot(),
+    AuthCognitoModule.register({
+      userPoolId: process.env.COGNITO_USER_POOL_ID!,
+      region: process.env.AWS_REGION!,
+    }),
   ],
-  exports: [PassportModule],
 })
-export class AuthModule {}
+export class AppModule {}
+
+// controller.ts
+
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+
+@Controller('example')
+export class ExampleController {
+  @UseGuards(AuthGuard('jwt'))
+  @Get()
+  getProtectedData() {
+    return { message: 'Ruta protegida por JWT' };
+  }
+}
 
 ```
 
-### 2. En un proyecto TypeScript puro
+### 2. 🧪 Uso en JavaScript o TypeScript puro (sin Nest)
 
 ```bash
+import express from 'express';
+import passport from 'passport';
 import { JwtStrategy } from 'jwt-auth-lib-cognito';
-import * as jwt from 'jsonwebtoken';
 
-async function main() {
-  const token = 'eyJraWQiOi...'; // JWT válido
-  const userPoolId = 'us-east-1_XXXX';
-  const region = 'us-east-1';
+const app = express();
 
-  const strategy = new JwtStrategy(userPoolId, region);
+const strategy = new JwtStrategy(
+  process.env.COGNITO_USER_POOL_ID,
+  process.env.AWS_REGION
+);
 
-  const done = (err: any, key: string | null) => {
-    if (err) {
-      console.error('Error al verificar token:', err);
-      return;
-    }
-    const payload = jwt.verify(token, key);
-    console.log('Token decodificado:', payload);
-  };
+passport.use('jwt', strategy);
 
-  // Llama al método estático getSecretOrKey para obtener la clave pública
-  await (JwtStrategy as any).getSecretOrKey(null, token, done);
-}
+app.use(passport.initialize());
 
-main();
+app.get(
+  '/secure',
+  passport.authenticate('jwt', { session: false }),
+  (req, res) => {
+    res.json({ message: 'Ruta protegida' });
+  }
+);
+
+app.listen(3000);
+
 ```
-
-### 3. En un proyecto JavaScript puro (Node.js)
-
-```bash
-const { JwtStrategy } = require('jwt-auth-lib-cognito');
-const jwt = require('jsonwebtoken');
-
-async function main() {
-  const token = 'eyJraWQiOi...'; // JWT válido
-  const userPoolId = 'us-east-1_XXXX';
-  const region = 'us-east-1';
-
-  const strategy = new JwtStrategy(userPoolId, region);
-
-  const done = (err, key) => {
-    if (err) {
-      console.error('Error:', err);
-      return;
-    }
-    const payload = jwt.verify(token, key);
-    console.log('Payload decodificado:', payload);
-  };
-
-  await JwtStrategy.getSecretOrKey(null, token, done);
-}
-
-main();
-```
-
 ## 🌐 Variables de Entorno Requeridas
 
 ### Ejemplo:
